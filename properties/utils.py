@@ -22,23 +22,36 @@ def get_all_properties():
 def get_redis_cache_metrics():
     """
     Retrieve Redis keyspace hit/miss metrics and calculate hit ratio.
+    Metrics are logged and returned as a dictionary.
     """
-    # Get the raw Redis client from django-redis
-    client = cache.client.get_client()
+    try:
+        # Get raw Redis client
+        client = cache.client.get_client()
+        info = client.info('stats')  # Redis statistics
 
-    info = client.info('stats')  # Get Redis stats
-    hits = info.get('keyspace_hits', 0)
-    misses = info.get('keyspace_misses', 0)
-    total = hits + misses
-    hit_ratio = hits / total if total > 0 else 0
+        hits = info.get('keyspace_hits', 0)
+        misses = info.get('keyspace_misses', 0)
+        total_requests = hits + misses
 
-    metrics = {
-        'hits': hits,
-        'misses': misses,
-        'hit_ratio': hit_ratio,
-    }
+        # Safe hit ratio calculation
+        hit_ratio = hits / total_requests if total_requests > 0 else 0
 
-    # Log metrics
-    logger.info(f"Redis Cache Metrics: Hits={hits}, Misses={misses}, Hit Ratio={hit_ratio:.2f}")
+        metrics = {
+            'hits': hits,
+            'misses': misses,
+            'hit_ratio': hit_ratio,
+        }
 
-    return metrics
+        # Log metrics
+        logger.info(f"Redis Cache Metrics: Hits={hits}, Misses={misses}, Hit Ratio={hit_ratio:.2f}")
+
+        return metrics
+
+    except Exception as e:
+        # Log error if something goes wrong
+        logger.error(f"Error retrieving Redis cache metrics: {e}")
+        return {
+            'hits': 0,
+            'misses': 0,
+            'hit_ratio': 0,
+        }
